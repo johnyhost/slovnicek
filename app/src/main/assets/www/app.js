@@ -35,7 +35,19 @@
   }
 
   /* ===================== word model ===================== */
-  var GRADES = {}, UNITS = {}, GW = {}, SKIDX = {}, KEYS = {};
+  var GRADES = {}, UNITS = {}, GW = {}, SKIDX = {}, KEYS = {}, SYN = {};
+  (DATA.synonyms || []).forEach(function (grp, gi) { grp.forEach(function (x) { SYN[cleanAns(x)] = gi; }); });
+  function senseTokens(sk) {
+    return String(sk).toLowerCase().replace(/\([^)]*\)/g, ' ').split(/[,;\/]/)
+      .map(function (t) { return t.replace(/[.!?…"„“]/g, '').replace(/\s+/g, ' ').trim(); }).filter(Boolean);
+  }
+  function synGroups(w) { var g = []; w.enAlts.forEach(function (a) { var k = SYN[cleanAns(a)]; if (k != null && g.indexOf(k) < 0) g.push(k); }); return g; }
+  // two words that a kid could reasonably confuse -> never offer them against each other
+  function confusable(a, b) {
+    if (a.key === b.key || a.skKey === b.skKey) return true;
+    if (a.senses.some(function (t) { return b.senses.indexOf(t) >= 0; })) return true;
+    return a.syn.some(function (g) { return b.syn.indexOf(g) >= 0; });
+  }
   DATA.grades.forEach(function (g) {
     GRADES[g.grade] = g; GW[g.grade] = []; SKIDX[g.grade] = {}; KEYS[g.grade] = {};
     var seen = {};
@@ -45,6 +57,7 @@
         var alts = pair[0].split('|').map(function (s) { return s.trim(); });
         var w = { en: alts[0], enAlts: alts, sk: pair[1], unit: u.id, grade: g.grade };
         w.key = normKey(w.en); w.id = g.grade + ':' + w.key; w.skKey = normKey(w.sk);
+        w.senses = senseTokens(w.sk); w.syn = synGroups(w);
         w.phrase = /\.\.\.|…/.test(w.en);
         w.multi = w.en.indexOf(' ') >= 0 || /[?!.]$/.test(w.en);
         w.typable = !w.phrase && w.en.split(' ').length <= 4 && w.en.length <= 26;
@@ -502,14 +515,13 @@
     return shuffle(out);
   }
   function distractors(w, n) {
-    var out = [], seen = {}, wantMulti = w.multi;
-    seen[w.key] = 1; seen['s:' + w.skKey] = 1;
+    var out = [], wantMulti = w.multi;
     function add(list, strictKind) {
       for (var i = 0; i < list.length && out.length < n; i++) {
         var c = list[i];
-        if (seen[c.key] || seen['s:' + c.skKey]) continue;
         if (strictKind && c.multi !== wantMulti) continue;
-        seen[c.key] = 1; seen['s:' + c.skKey] = 1; out.push(c);
+        if (confusable(c, w) || out.some(function (o) { return confusable(o, c); })) continue;
+        out.push(c);
       }
     }
     var unitW = shuffle(UNITS[w.unit].W), gw = shuffle(GW[w.grade]);
@@ -529,8 +541,8 @@
     return ex;
   }
   function makeMatch(words) {
-    var picked = [], seen = {};
-    words.forEach(function (w) { if (picked.length < 5 && !seen[w.key] && !seen['s:' + w.skKey]) { seen[w.key] = 1; seen['s:' + w.skKey] = 1; picked.push(w); } });
+    var picked = [];
+    words.forEach(function (w) { if (picked.length < 5 && !picked.some(function (o) { return confusable(o, w); })) picked.push(w); });
     return { t: 'match', words: picked, L: shuffle(picked.map(function (_, i) { return i; })), R: shuffle(picked.map(function (_, i) { return i; })), sel: null, done: {}, miss: {}, mist: 0 };
   }
   function buildLesson(words) {
@@ -540,7 +552,8 @@
     plan.forEach(function (x) { x.d = DIFF[x.t] + Math.random() * 1.4; });
     plan.sort(function (a, b) { return a.d - b.d; });
     var q = plan.map(function (x) { return makeEx(x.t, x.w); });
-    if (words.length >= 4) q.splice(Math.min(2, q.length), 0, makeMatch(shuffle(words)));
+    var mt = makeMatch(shuffle(words));
+    if (mt.words.length >= 3) q.splice(Math.min(2, q.length), 0, mt);
     // introduce brand-new words (max 3) right before their first exercise
     var intros = 0, p = P();
     words.forEach(function (w) {
@@ -634,7 +647,13 @@
     $('#aline').innerHTML = a; $('#tiles').innerHTML = t;
     var cb = $('#checkBtn'); if (cb) cb.disabled = ex.built.length === 0;
   }
-  function acceptableEn(w) { var set = w.enAlts.slice(); (SKIDX[w.grade][w.skKey] || []).forEach(function (a) { if (set.indexOf(a) < 0) set.push(a); }); return set; }
+  function acceptableEn(w) {
+    var set = w.enAlts.slice();
+    function add(a) { if (set.indexOf(a) < 0) set.push(a); }
+    (SKIDX[w.grade][w.skKey] || []).forEach(add);
+    w.syn.forEach(function (g) { DATA.synonyms[g].forEach(add); });
+    return set;
+  }
   function gradeTyped(input, alts, grade) {
     var a = cleanAns(input); if (!a) return { r: 'wrong', alt: alts[0] };
     var best = 99, bestAlt = alts[0];
@@ -711,7 +730,8 @@
     } else if (res === 'wrong') {
       body = '<div><span class="muted">Správne · Correct:</span><br><b>' + esc(w.enAlts.join(' / ')) + '</b> = ' + esc(w.sk) + '</div>';
     } else {
-      body = '<div><b>' + esc(extra.alt && extra.alt !== w.en ? extra.alt : w.en) + '</b> = ' + esc(w.sk) + '</div>';
+      var other = extra.alt && w.enAlts.indexOf(extra.alt) < 0;
+      body = '<div><b>' + esc(other ? extra.alt : w.en) + '</b> = ' + esc(w.sk) + (other ? '<br><span class="muted">V učebnici · In the book:</span> <b>' + esc(w.en) + '</b>' : '') + '</div>';
     }
     body += '<button class="spk" data-a="sayCur">🔊</button>';
     var btn = res === 'wrong' ? 'bad' : res === 'almost' ? 'warn' : 'ok';
@@ -983,7 +1003,7 @@
       return false;
     },
     // test hooks
-    _state: function () { return S; }, _ui: function () { return ui; }, _grade: gradeTyped
+    _state: function () { return S; }, _ui: function () { return ui; }, _grade: gradeTyped, _acc: acceptableEn, _dis: distractors, _confusable: confusable, _units: UNITS
   };
 
   /* ===================== boot ===================== */

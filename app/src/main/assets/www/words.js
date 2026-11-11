@@ -12,7 +12,14 @@
  *             (všetky alternatívy sa pri písaní uznajú, zobrazí sa prvá)
  */
 window.SLOVNICEK_DATA = {
-  version: 2,
+  version: 3,
+  /* Anglické synonymá: v úlohách sa nikdy neobjavia proti sebe a pri písaní sa uzná ktorékoľvek.
+     English synonyms: never offered against each other, any of them is accepted when typing. */
+  synonyms: [
+    ["bye", "goodbye"], ["hello", "hi"], ["dad", "daddy", "father"], ["mum", "mom", "mother"],
+    ["grandma", "grandmother"], ["grandpa", "grandfather", "granddad"], ["beautiful", "lovely", "pretty"],
+    ["great", "wonderful"], ["little", "small"], ["speak", "talk"], ["quick", "fast"]
+  ],
   grades: [
     { grade: 1, units: [] },
     { grade: 2, units: [] },
