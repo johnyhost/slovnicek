@@ -99,7 +99,7 @@ window.SLOVNICEK_DATA = {
       { id: "g3-u10", tag: "Unit 10", title: "Tvary a vzhľad", en: "Shapes & looks", icon: "🔷", words: [
         ["bath","vaňa"],["best","najlepší"],["blond|blonde","blond, svetlovlasý"],["brown","hnedý"],["circle","kruh"],
         ["count","počítať"],["curly","kučeravý"],["dear","drahý"],["diamond","kosoštvorec"],["friend","priateľ"],
-        ["from","od"],["great","skvelý"],["hair","vlasy"],["jumper","tričko"],["just","len"],["long","dlhý"],
+        ["from","od"],["great","skvelý"],["hair","vlasy"],["jumper","sveter"],["just","len"],["long","dlhý"],
         ["new","nový"],["over there","tamto"],["picture","obrázok"],["rectangle","obdĺžnik"],["round","okrúhly"],
         ["short","krátky"],["side","strana"],["smooth","hladký"],["square","štvorec"],["straight","rovný"],
         ["tall","vysoký"],["teeth","zuby"],["tell","povedať"],["the same","taký istý, rovnaký"],["three","tri"],
